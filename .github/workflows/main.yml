@@ -27,7 +27,7 @@ jobs:
       - run: flutter config --enable-web
         shell: bash
         working-directory: ${{inputs.workingDir}}
-      - run: flutter build web --release --base-href="/moon_calendar_generator"
+      - run: flutter build web --release --base-href="/moon_calendar_generator/"
         shell: bash
         working-directory: ${{inputs.workingDir}}
       
