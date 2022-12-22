@@ -31,7 +31,7 @@ jobs:
         shell: bash
         working-directory: ${{inputs.workingDir}}
       - run: ls
-        working-directory: './build'
+        working-directory: './build/web'
 #       - name: Checkout
 #         uses: actions/checkout@v3
       - name: Setup Pages
@@ -40,7 +40,7 @@ jobs:
         uses: actions/upload-pages-artifact@v1
         with:
           # Upload entire repository
-           path: './build'
+           path: './build/web'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
