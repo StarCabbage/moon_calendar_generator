@@ -1,4 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:moon_phase/download/download.dart';
+import 'package:moon_phase/moon_phase.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:tuple/tuple.dart';
 
 void main() {
   runApp(const MyApp());
@@ -23,15 +33,6 @@ class MyApp extends StatelessWidget {
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -39,68 +40,120 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  DateTimeRange? dateRange;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  List<Tuple3<DateTime, String, int>> moonDates = [];
+
+  void generateMoonPhase() {
+    moonDates.clear();
+    var day = dateRange!.start.toUtc();
+    while (day.compareTo(dateRange!.end) < 1) {
+      final age = Moon.ageOfMoon(day);
+      final phase = Moon.getMoonPhase(age);
+      moonDates.add(Tuple3(day, phase!.name.toCapitalCase(), age.toInt()));
+      day = day.add(const Duration(hours: 24));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
+      body: CustomScrollView(
+        slivers: [
+          Builder(
+            builder: (
+              context,
+            ) {
+              return dateRange == null
+                  ? const SliverFillRemaining(
+                      child: Center(child: Text('No date range selected')))
+                  : SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final item = moonDates[index];
+                          return ListTile(
+                            title:
+                                Text('Moon day ${item.item3} - ${item.item2}'),
+                            subtitle: Text(
+                                '${item.item1} - ${DateFormat.EEEE().format(item.item1)} - ${item.item1.timeZoneName}\n'
+                                '${item.item1.toLocal()} - ${DateFormat.EEEE().format(item.item1.toLocal())} - ${item.item1.toLocal().timeZoneName}'),
+                          );
+                        },
+                        childCount: moonDates.length,
+                      ),
+                    );
+            },
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: () async {
+              final DateTimeRange? picked = await showDateRangePicker(
+                context: context,
+                initialDateRange: dateRange,
+                firstDate: DateTime(1900),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) {
+                setState(() {
+                  dateRange = picked;
+                  generateMoonPhase();
+                });
+              }
+            },
+            label: Text(dateRange == null
+                ? 'Choose date range'
+                : '${dateRange!.start} - ${dateRange!.end}'),
+          ),
+          const SizedBox(width: 8),
+          FloatingActionButton(
+            onPressed: () async {
+              if (dateRange == null) {
+                return;
+              }
+
+              // create the .ics file and write the events to it
+              String fileName =
+                  '${DateFormat('yyyy_MM_dd').format(dateRange!.start)}_moon_phases.ics';
+              StringBuffer sink = StringBuffer();
+
+              sink.write('BEGIN:VCALENDAR\n');
+              sink.write('VERSION:2.0\n');
+              sink.write('PRODID:-//My Calendar//NONSGML v1.0//EN\n');
+
+              for (int i = 0; i < moonDates.length; i++) {
+                final item = moonDates[i];
+                String phaseName = item.item2;
+                sink.write('BEGIN:VEVENT\n');
+
+                /// in UTC by default
+                sink.write(
+                    'DTSTART;VALUE=DATE:${DateFormat('yyyyMMddTHHmmss').format(item.item1)}Z\n');
+                sink.write('SUMMARY:Moon phase: $phaseName\n');
+                sink.write(
+                    'DESCRIPTION:Moon day: ${item.item3}. Generate more dates at starcabbage.github.com/moon_calendar_generator\n');
+                sink.write(
+                    'URL:https://starcabbage.github.com/moon_calendar_generator/\n');
+                sink.write('END:VEVENT\n');
+              }
+
+              sink.write('END:VCALENDAR\n');
+
+              final Uint8List bytes =
+                  Uint8List.fromList(utf8.encode(sink.toString()));
+              download(bytes, downloadName: fileName);
+            },
+            tooltip: 'Generate',
+            child: const Icon(Icons.file_download),
+          ),
+        ],
+      ),
     );
   }
 }
