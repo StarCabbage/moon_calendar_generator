@@ -137,9 +137,9 @@ class _MyHomePageState extends State<MyHomePage> {
                     'DTSTART;VALUE=DATE:${DateFormat('yyyyMMddTHHmmss').format(item.item1)}Z\n');
                 sink.write('SUMMARY:Moon phase: $phaseName\n');
                 sink.write(
-                    'DESCRIPTION:Moon day: ${item.item3}. Generate more dates at starcabbage.github.com/moon_calendar_generator\n');
+                    'DESCRIPTION:Moon day: ${item.item3}. Generate more dates at starcabbage.github.io/moon_calendar_generator\n');
                 sink.write(
-                    'URL:https://starcabbage.github.com/moon_calendar_generator/\n');
+                    'URL:https://starcabbage.github.io/moon_calendar_generator/\n');
                 sink.write('END:VEVENT\n');
               }
 
