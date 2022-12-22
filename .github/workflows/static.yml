@@ -2,6 +2,8 @@
 name: Deploy static content to Pages
 
 on:
+  status:
+    branches: ["gh-pages"]
   # Runs on pushes targeting the default branch
   push:
     branches: ["gh-pages"]
