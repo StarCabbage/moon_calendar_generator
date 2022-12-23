@@ -42,15 +42,17 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   DateTimeRange? dateRange;
 
-  List<Tuple3<DateTime, String, int>> moonDates = [];
+  List<Tuple3<DateTime, String, double>> moonDates = [];
 
   void generateMoonPhase() {
     moonDates.clear();
     var day = dateRange!.start.toUtc();
+    day = day.subtract(Duration(hours: day.hour));
+    day = day.add(const Duration(hours: 12));
     while (day.compareTo(dateRange!.end) < 1) {
       final age = Moon.ageOfMoon(day);
       final phase = Moon.getMoonPhase(age);
-      moonDates.add(Tuple3(day, phase!.name.toCapitalCase(), age.toInt()));
+      moonDates.add(Tuple3(day, phase!.name.toCapitalCase(), age));
       day = day.add(const Duration(hours: 24));
     }
   }
@@ -135,9 +137,11 @@ class _MyHomePageState extends State<MyHomePage> {
                 /// in UTC by default
                 sink.write(
                     'DTSTART;VALUE=DATE:${DateFormat('yyyyMMddTHHmmss').format(item.item1)}Z\n');
+
+                sink.write('TZID:UTC\n');
                 sink.write('SUMMARY:Moon phase: $phaseName\n');
                 sink.write(
-                    'DESCRIPTION:Moon day: ${item.item3}. Generate more dates at starcabbage.github.io/moon_calendar_generator\n');
+                    'DESCRIPTION:Moon day: ${item.item3.toStringAsFixed(3)}. Generate more dates at starcabbage.github.io/moon_calendar_generator\n');
                 sink.write(
                     'URL:https://starcabbage.github.io/moon_calendar_generator/\n');
                 sink.write('END:VEVENT\n');
